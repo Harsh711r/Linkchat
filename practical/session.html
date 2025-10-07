@@ -1,0 +1,726 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Session - PeerLink</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/feather-icons"></script>
+    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        stone: {
+                            500: '#78716c',
+                            600: '#57534e',
+                            700: '#44403c',
+                            800: '#292524',
+                            900: '#1c1917',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        .connection-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            display: inline-block;
+            margin-right: 5px;
+        }
+        .connection-good {
+            background-color: #10b981;
+        }
+        .connection-fair {
+            background-color: #f59e0b;
+        }
+        .connection-poor {
+            background-color: #ef4444;
+        }
+        .chat-message {
+            max-width: 80%;
+        }
+        .file-item {
+            transition: all 0.2s;
+        }
+        .file-item:hover {
+            background-color: rgba(120, 113, 108, 0.2);
+        }
+        .tab-active {
+            border-bottom: 2px solid #78716c;
+        }
+        .progress-bar {
+            transition: width 0.3s ease;
+        }
+    </style>
+</head>
+<body class="bg-stone-900 text-stone-100 min-h-screen">
+    <!-- Navigation -->
+    <nav class="bg-stone-800 p-4 shadow-lg">
+        <div class="container mx-auto flex justify-between items-center">
+            <div class="flex items-center space-x-2">
+                <i data-feather="send" class="text-stone-400"></i>
+                <h1 class="text-xl font-bold">PeerLink</h1>
+            </div>
+            <div class="flex items-center space-x-4">
+                <div class="flex items-center text-sm text-stone-300">
+                    <span id="connection-indicator" class="connection-dot connection-poor"></span>
+                    <span>Room: <span id="current-room" class="font-mono">------</span></span>
+                </div>
+                <button onclick="endSession()" class="flex items-center text-stone-300 hover:text-white">
+                    <i data-feather="log-out" class="mr-1"></i> Leave
+                </button>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="container mx-auto p-4">
+        <div class="max-w-6xl mx-auto bg-stone-800 rounded-xl shadow-lg overflow-hidden">
+            <!-- Session Header -->
+            <div class="bg-stone-700 p-4 flex justify-between items-center">
+                <div>
+                    <h2 class="text-xl font-semibold">Active Session</h2>
+                    <div class="flex items-center text-sm text-stone-300 mt-1">
+                        <span id="status-indicator" class="connection-dot connection-poor"></span>
+                        <span id="connection-status">Initializing...</span>
+                        <span class="mx-2">•</span>
+                        <span id="participant-count">1 participant</span>
+                    </div>
+                </div>
+                <div class="flex space-x-2">
+                    <button id="copy-room" class="flex items-center text-stone-300 hover:text-white bg-stone-600 px-3 py-1 rounded">
+                        <i data-feather="copy" class="mr-1 w-4 h-4"></i> Copy Code
+                    </button>
+                </div>
+            </div>
+
+            <!-- Tabs -->
+            <div class="flex border-b border-stone-700">
+                <button id="chat-tab" class="tab-active flex-1 py-3 font-medium text-center hover:bg-stone-700 flex items-center justify-center">
+                    <i data-feather="message-square" class="mr-2 w-4 h-4"></i> Chat
+                </button>
+                <button id="files-tab" class="flex-1 py-3 font-medium text-center hover:bg-stone-700 flex items-center justify-center">
+                    <i data-feather="file" class="mr-2 w-4 h-4"></i> File Sharing
+                </button>
+            </div>
+
+            <!-- Chat Panel -->
+            <div id="chat-panel" class="p-4 h-96 overflow-y-auto">
+                <div class="space-y-3" id="chat-messages">
+                    <!-- Messages will appear here -->
+                </div>
+            </div>
+
+            <!-- File Sharing Panel -->
+            <div id="files-panel" class="p-4 h-96 overflow-y-auto hidden">
+                <div class="mb-4">
+                    <div class="flex items-center justify-between mb-2">
+                        <h3 class="font-semibold">Shared Files</h3>
+                        <button id="upload-btn" class="flex items-center text-sm bg-stone-600 hover:bg-stone-500 px-3 py-1 rounded">
+                            <i data-feather="upload" class="mr-1 w-4 h-4"></i> Upload
+                        </button>
+                    </div>
+                    <input type="file" id="file-input" class="hidden" multiple>
+                    
+                    <div class="space-y-2" id="file-list">
+                        <!-- Files will appear here -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- Message Input -->
+            <div id="message-input-container" class="border-t border-stone-700 p-4">
+                <div class="flex">
+                    <input 
+                        type="text" 
+                        id="message-input" 
+                        placeholder="Type a message..." 
+                        class="flex-1 bg-stone-700 border border-stone-600 rounded-l-lg py-2 px-3 focus:outline-none focus:ring-1 focus:ring-stone-500 focus:border-transparent"
+                    >
+                    <button id="send-btn" class="bg-stone-600 hover:bg-stone-500 text-white py-2 px-4 rounded-r-lg">
+                        <i data-feather="send" class="w-5 h-5"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- File Drop Zone -->
+            <div id="file-drop-zone" class="border-t border-stone-700 p-4 hidden cursor-pointer">
+                <div class="border-2 border-dashed border-stone-600 rounded-lg p-6 text-center hover:border-stone-500 transition">
+                    <i data-feather="upload-cloud" class="mx-auto text-stone-400 w-10 h-10 mb-2"></i>
+                    <p class="text-stone-300">Drag and drop files here to share</p>
+                    <p class="text-sm text-stone-500 mt-1">or click to browse files</p>
+                </div>
+            </div>
+
+            <!-- Participants Panel -->
+            <div class="border-t border-stone-700 p-4">
+                <h3 class="font-semibold mb-3">Participants</h3>
+                <div class="space-y-2" id="participants-list">
+                    <!-- Participants will appear here -->
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        feather.replace();
+        
+        // Get URL parameters
+        const urlParams = new URLSearchParams(window.location.search);
+        const roomCode = urlParams.get('room') || Math.random().toString(36).substr(2, 6).toUpperCase();
+        const isHost = urlParams.get('host') !== 'false';
+        const username = urlParams.get('username') || (isHost ? 'Host' : 'Guest');
+        
+        // Set room code display
+        document.getElementById('current-room').textContent = roomCode;
+        
+        // WebRTC Setup
+        let peer;
+        let connections = {};
+        let dataChannels = {};
+        const CHUNK_SIZE = 16384; // 16KB chunks for file transfer
+        let fileTransfers = {};
+        
+        // Initialize PeerJS
+        function initializePeer() {
+            const peerId = isHost ? `peerlink-${roomCode}` : `peerlink-${roomCode}-${Date.now()}`;
+            
+            peer = new Peer(peerId, {
+                config: {
+                    iceServers: [
+                        { urls: 'stun:stun.l.google.com:19302' },
+                        { urls: 'stun:global.stun.twilio.com:3478' }
+                    ]
+                }
+            });
+            
+            peer.on('open', (id) => {
+                console.log('My peer ID is:', id);
+                updateConnectionStatus('Connected', 'good');
+                addSystemMessage(`You joined as ${username}`);
+                addParticipantToUI(username, isHost);
+                
+                // If not host, connect to host
+                if (!isHost) {
+                    connectToHost();
+                }
+            });
+            
+            peer.on('connection', (conn) => {
+                console.log('Incoming connection from:', conn.peer);
+                setupConnection(conn);
+            });
+            
+            peer.on('error', (err) => {
+                console.error('Peer error:', err);
+                updateConnectionStatus('Connection error', 'poor');
+                if (err.type === 'peer-unavailable') {
+                    addSystemMessage('Cannot connect to host. The room may not exist.');
+                }
+            });
+        }
+        
+        function connectToHost() {
+            const hostId = `peerlink-${roomCode}`;
+            console.log('Connecting to host:', hostId);
+            
+            const conn = peer.connect(hostId, {
+                reliable: true,
+                metadata: { username: username }
+            });
+            
+            setupConnection(conn);
+        }
+        
+        function setupConnection(conn) {
+            connections[conn.peer] = conn;
+            
+            conn.on('open', () => {
+                console.log('Connection opened with:', conn.peer);
+                updateConnectionStatus('Connected', 'good');
+                
+                // Send handshake
+                conn.send({
+                    type: 'handshake',
+                    username: username,
+                    isHost: isHost
+                });
+                
+                dataChannels[conn.peer] = conn;
+            });
+            
+            conn.on('data', (data) => {
+                handleData(data, conn);
+            });
+            
+            conn.on('close', () => {
+                console.log('Connection closed with:', conn.peer);
+                removeParticipant(conn.metadata?.username || conn.peer);
+                delete connections[conn.peer];
+                delete dataChannels[conn.peer];
+                updateParticipantCount();
+            });
+            
+            conn.on('error', (err) => {
+                console.error('Connection error:', err);
+            });
+        }
+        
+        function handleData(data, conn) {
+            console.log('Received data:', data);
+            
+            switch(data.type) {
+                case 'handshake':
+                    conn.metadata = { username: data.username };
+                    addParticipantToUI(data.username, data.isHost);
+                    addSystemMessage(`${data.username} joined the session`);
+                    updateParticipantCount();
+                    
+                    // Host broadcasts new participant to others
+                    if (isHost) {
+                        broadcastToOthers({
+                            type: 'participant-joined',
+                            username: data.username
+                        }, conn.peer);
+                    }
+                    break;
+                    
+                case 'participant-joined':
+                    addParticipantToUI(data.username, false);
+                    addSystemMessage(`${data.username} joined the session`);
+                    updateParticipantCount();
+                    break;
+                    
+                case 'message':
+                    addMessageToUI(data.message, data.username, false);
+                    break;
+                    
+                case 'file-offer':
+                    handleFileOffer(data, conn);
+                    break;
+                    
+                case 'file-chunk':
+                    handleFileChunk(data);
+                    break;
+                    
+                case 'file-complete':
+                    handleFileComplete(data);
+                    break;
+            }
+        }
+        
+        function broadcastToOthers(data, excludePeer) {
+            Object.keys(dataChannels).forEach(peerId => {
+                if (peerId !== excludePeer && dataChannels[peerId]) {
+                    dataChannels[peerId].send(data);
+                }
+            });
+        }
+        
+        function broadcast(data) {
+            Object.values(dataChannels).forEach(channel => {
+                if (channel && channel.open) {
+                    channel.send(data);
+                }
+            });
+        }
+        
+        // UI Functions
+        function updateConnectionStatus(status, quality) {
+            document.getElementById('connection-status').textContent = status;
+            const indicator = document.getElementById('status-indicator');
+            const navIndicator = document.getElementById('connection-indicator');
+            
+            indicator.className = `connection-dot connection-${quality}`;
+            navIndicator.className = `connection-dot connection-${quality}`;
+        }
+        
+        function addSystemMessage(message) {
+            const messagesContainer = document.getElementById('chat-messages');
+            const messageElement = document.createElement('div');
+            messageElement.className = 'text-center text-sm text-stone-400 my-2';
+            messageElement.textContent = message;
+            messagesContainer.appendChild(messageElement);
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        }
+        
+        function addMessageToUI(message, sender, isSelf = false) {
+            const messagesContainer = document.getElementById('chat-messages');
+            const messageElement = document.createElement('div');
+            messageElement.className = `chat-message bg-stone-700 rounded-lg p-3 ${isSelf ? 'ml-auto' : ''}`;
+            
+            const now = new Date();
+            const timeString = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            
+            messageElement.innerHTML = `
+                <div class="flex justify-between items-baseline mb-1">
+                    <span class="font-semibold ${isSelf ? 'text-stone-300' : 'text-stone-100'}">${sender}</span>
+                    <span class="text-xs text-stone-400 ml-2">${timeString}</span>
+                </div>
+                <p class="break-words">${escapeHtml(message)}</p>
+            `;
+            
+            messagesContainer.appendChild(messageElement);
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        }
+        
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+        
+        function addParticipantToUI(name, isHostUser = false) {
+            const participantsList = document.getElementById('participants-list');
+            
+            // Check if already exists
+            const existingId = `participant-${name.replace(/\s/g, '-')}`;
+            if (document.getElementById(existingId)) {
+                return;
+            }
+            
+            const participantElement = document.createElement('div');
+            participantElement.id = existingId;
+            participantElement.className = 'flex items-center justify-between bg-stone-700 rounded-lg p-2';
+            participantElement.innerHTML = `
+                <div class="flex items-center">
+                    <i data-feather="user" class="text-stone-400 mr-2 w-4 h-4"></i>
+                    <span>${name}${isHostUser ? ' (Host)' : ''}</span>
+                </div>
+                <span class="text-xs text-stone-400">Connected</span>
+            `;
+            
+            participantsList.appendChild(participantElement);
+            feather.replace();
+        }
+        
+        function removeParticipant(name) {
+            const participantId = `participant-${name.replace(/\s/g, '-')}`;
+            const element = document.getElementById(participantId);
+            if (element) {
+                element.remove();
+                addSystemMessage(`${name} left the session`);
+            }
+        }
+        
+        function updateParticipantCount() {
+            const count = document.getElementById('participants-list').children.length;
+            document.getElementById('participant-count').textContent = 
+                `${count} participant${count !== 1 ? 's' : ''}`;
+        }
+        
+        // File Handling
+        function addFileToUI(filename, size, sender, fileId) {
+            const fileList = document.getElementById('file-list');
+            const fileElement = document.createElement('div');
+            
+            let sizeString;
+            if (size < 1024) {
+                sizeString = `${size} B`;
+            } else if (size < 1024 * 1024) {
+                sizeString = `${(size / 1024).toFixed(1)} KB`;
+            } else {
+                sizeString = `${(size / (1024 * 1024)).toFixed(1)} MB`;
+            }
+            
+            fileElement.id = `file-${fileId}`;
+            fileElement.className = 'file-item bg-stone-700 rounded-lg p-3';
+            fileElement.innerHTML = `
+                <div class="flex items-center">
+                    <i data-feather="file" class="text-stone-400 mr-3 w-5 h-5"></i>
+                    <div class="flex-1">
+                        <div class="font-medium">${escapeHtml(filename)}</div>
+                        <div class="text-xs text-stone-400">${sizeString} • ${sender}</div>
+                        <div class="progress-container mt-2 hidden">
+                            <div class="bg-stone-600 rounded-full h-2">
+                                <div class="progress-bar bg-stone-400 h-2 rounded-full" style="width: 0%"></div>
+                            </div>
+                            <div class="text-xs text-stone-400 mt-1">Transferring...</div>
+                        </div>
+                    </div>
+                    <button class="download-btn text-stone-300 hover:text-white ml-3" data-file-id="${fileId}">
+                        <i data-feather="download" class="w-4 h-4"></i>
+                    </button>
+                </div>
+            `;
+            
+            fileList.appendChild(fileElement);
+            feather.replace();
+        }
+        
+        function handleFileOffer(data, conn) {
+            const fileId = data.fileId;
+            fileTransfers[fileId] = {
+                filename: data.filename,
+                size: data.size,
+                chunks: [],
+                receivedSize: 0,
+                sender: data.sender
+            };
+            
+            addFileToUI(data.filename, data.size, data.sender, fileId);
+        }
+        
+        function handleFileChunk(data) {
+            const transfer = fileTransfers[data.fileId];
+            if (transfer) {
+                transfer.chunks.push(data.chunk);
+                transfer.receivedSize += data.chunk.length;
+                
+                // Update progress
+                const progress = (transfer.receivedSize / transfer.size) * 100;
+                const fileElement = document.getElementById(`file-${data.fileId}`);
+                if (fileElement) {
+                    const progressContainer = fileElement.querySelector('.progress-container');
+                    const progressBar = fileElement.querySelector('.progress-bar');
+                    progressContainer.classList.remove('hidden');
+                    progressBar.style.width = `${progress}%`;
+                }
+            }
+        }
+        
+        function handleFileComplete(data) {
+            const transfer = fileTransfers[data.fileId];
+            if (transfer) {
+                const blob = new Blob(transfer.chunks);
+                transfer.blob = blob;
+                transfer.url = URL.createObjectURL(blob);
+                
+                // Update UI
+                const fileElement = document.getElementById(`file-${data.fileId}`);
+                if (fileElement) {
+                    const progressContainer = fileElement.querySelector('.progress-container');
+                    progressContainer.classList.add('hidden');
+                    
+                    const downloadBtn = fileElement.querySelector('.download-btn');
+                    downloadBtn.onclick = () => downloadFile(data.fileId);
+                }
+                
+                addSystemMessage(`File received: ${transfer.filename}`);
+            }
+        }
+        
+        function downloadFile(fileId) {
+            const transfer = fileTransfers[fileId];
+            if (transfer && transfer.url) {
+                const a = document.createElement('a');
+                a.href = transfer.url;
+                a.download = transfer.filename;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+            }
+        }
+        
+        function sendFile(file) {
+            const fileId = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+            const reader = new FileReader();
+            
+            reader.onload = async (e) => {
+                const arrayBuffer = e.target.result;
+                const totalChunks = Math.ceil(arrayBuffer.byteLength / CHUNK_SIZE);
+                
+                // Send file offer
+                broadcast({
+                    type: 'file-offer',
+                    fileId: fileId,
+                    filename: file.name,
+                    size: file.size,
+                    sender: username
+                });
+                
+                // Add to own UI
+                addFileToUI(file.name, file.size, username, fileId);
+                
+                // Store for own download
+                fileTransfers[fileId] = {
+                    filename: file.name,
+                    size: file.size,
+                    blob: file,
+                    url: URL.createObjectURL(file),
+                    sender: username
+                };
+                
+                const downloadBtn = document.querySelector(`[data-file-id="${fileId}"]`);
+                if (downloadBtn) {
+                    downloadBtn.onclick = () => downloadFile(fileId);
+                }
+                
+                // Send chunks
+                for (let i = 0; i < totalChunks; i++) {
+                    const start = i * CHUNK_SIZE;
+                    const end = Math.min(start + CHUNK_SIZE, arrayBuffer.byteLength);
+                    const chunk = arrayBuffer.slice(start, end);
+                    
+                    broadcast({
+                        type: 'file-chunk',
+                        fileId: fileId,
+                        chunk: chunk,
+                        chunkIndex: i,
+                        totalChunks: totalChunks
+                    });
+                    
+                    // Small delay to prevent overwhelming the connection
+                    await new Promise(resolve => setTimeout(resolve, 10));
+                }
+                
+                // Send completion
+                broadcast({
+                    type: 'file-complete',
+                    fileId: fileId
+                });
+                
+                addSystemMessage(`File shared: ${file.name}`);
+            };
+            
+            reader.readAsArrayBuffer(file);
+        }
+        
+        // Tab switching
+        const chatTab = document.getElementById('chat-tab');
+        const filesTab = document.getElementById('files-tab');
+        const chatPanel = document.getElementById('chat-panel');
+        const filesPanel = document.getElementById('files-panel');
+        const messageInputContainer = document.getElementById('message-input-container');
+        const fileDropZone = document.getElementById('file-drop-zone');
+        
+        chatTab.addEventListener('click', () => {
+            chatTab.classList.add('tab-active');
+            filesTab.classList.remove('tab-active');
+            chatPanel.classList.remove('hidden');
+            filesPanel.classList.add('hidden');
+            messageInputContainer.classList.remove('hidden');
+            fileDropZone.classList.add('hidden');
+        });
+        
+        filesTab.addEventListener('click', () => {
+            filesTab.classList.add('tab-active');
+            chatTab.classList.remove('tab-active');
+            filesPanel.classList.remove('hidden');
+            chatPanel.classList.add('hidden');
+            messageInputContainer.classList.add('hidden');
+            fileDropZone.classList.remove('hidden');
+        });
+        
+        // Copy room code
+        document.getElementById('copy-room').addEventListener('click', () => {
+            navigator.clipboard.writeText(roomCode).then(() => {
+                const btn = document.getElementById('copy-room');
+                const originalText = btn.innerHTML;
+                btn.innerHTML = '<i data-feather="check" class="mr-1 w-4 h-4"></i> Copied!';
+                feather.replace();
+                setTimeout(() => {
+                    btn.innerHTML = originalText;
+                    feather.replace();
+                }, 2000);
+            });
+        });
+        
+        // File upload
+        const uploadBtn = document.getElementById('upload-btn');
+        const fileInput = document.getElementById('file-input');
+        
+        uploadBtn.addEventListener('click', () => {
+            fileInput.click();
+        });
+        
+        fileInput.addEventListener('change', (e) => {
+            if (e.target.files.length > 0) {
+                Array.from(e.target.files).forEach(file => {
+                    if (file.size > 100 * 1024 * 1024) { // 100MB limit
+                        addSystemMessage(`File ${file.name} is too large (max 100MB)`);
+                        return;
+                    }
+                    sendFile(file);
+                });
+                fileInput.value = '';
+            }
+        });
+        
+        // File drop zone
+        fileDropZone.addEventListener('click', () => {
+            fileInput.click();
+        });
+        
+        fileDropZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            fileDropZone.querySelector('.border-dashed').classList.add('border-stone-500');
+        });
+        
+        fileDropZone.addEventListener('dragleave', () => {
+            fileDropZone.querySelector('.border-dashed').classList.remove('border-stone-500');
+        });
+        
+        fileDropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            fileDropZone.querySelector('.border-dashed').classList.remove('border-stone-500');
+            
+            if (e.dataTransfer.files.length > 0) {
+                Array.from(e.dataTransfer.files).forEach(file => {
+                    if (file.size > 100 * 1024 * 1024) {
+                        addSystemMessage(`File ${file.name} is too large (max 100MB)`);
+                        return;
+                    }
+                    sendFile(file);
+                });
+            }
+        });
+        
+        // Send message
+        const messageInput = document.getElementById('message-input');
+        const sendBtn = document.getElementById('send-btn');
+        
+        sendBtn.addEventListener('click', sendMessage);
+        messageInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                sendMessage();
+            }
+        });
+        
+        function sendMessage() {
+            const message = messageInput.value.trim();
+            if (message && Object.keys(dataChannels).length > 0) {
+                broadcast({
+                    type: 'message',
+                    message: message,
+                    username: username
+                });
+                addMessageToUI(message, username, true);
+                messageInput.value = '';
+            } else if (message && Object.keys(dataChannels).length === 0) {
+                addSystemMessage('No peers connected. Waiting for others to join...');
+                messageInput.value = '';
+            }
+        }
+        
+        // End session
+        function endSession() {
+            if (confirm('Are you sure you want to leave the session?')) {
+                if (peer) {
+                    peer.destroy();
+                }
+                window.location.href = 'index.html';
+            }
+        }
+        
+        // Initialize on load
+        initializePeer();
+        
+        // Update participant count initially
+        updateParticipantCount();
+        
+        // Cleanup on page unload
+        window.addEventListener('beforeunload', () => {
+            if (peer) {
+                peer.destroy();
+            }
+        });
+    </script>
+</body>
+</html>

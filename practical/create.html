@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Create Room - PeerLink</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/feather-icons"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        stone: {
+                            500: '#78716c',
+                            600: '#57534e',
+                            700: '#44403c',
+                            800: '#292524',
+                            900: '#1c1917',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="bg-stone-900 text-stone-100 min-h-screen">
+    <!-- Navigation -->
+    <nav class="bg-stone-800 p-4 shadow-lg">
+        <div class="container mx-auto flex justify-between items-center">
+            <div class="flex items-center space-x-2">
+                <i data-feather="send" class="text-stone-400"></i>
+                <h1 class="text-xl font-bold">PeerLink</h1>
+            </div>
+            <button onclick="window.location.href='index.html'" class="flex items-center text-stone-300 hover:text-white">
+                <i data-feather="home" class="mr-1"></i> Home
+            </button>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="container mx-auto p-4">
+        <div class="max-w-2xl mx-auto bg-stone-800 rounded-xl p-6 shadow-lg">
+            <div class="text-center mb-8">
+                <h2 class="text-3xl font-bold mb-2">Create New Session</h2>
+                <p class="text-stone-300">You'll be the host of this P2P session</p>
+            </div>
+
+            <div class="bg-stone-700 p-6 rounded-lg mb-6">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="text-xl font-semibold">Room Code</h3>
+                    <button id="refresh-code" class="text-stone-300 hover:text-white flex items-center">
+                        <i data-feather="refresh-cw" class="mr-1 w-4 h-4"></i> Regenerate
+                    </button>
+                </div>
+                
+                <div class="text-center py-4">
+                    <div id="room-code" class="text-5xl font-mono font-bold tracking-widest text-white mb-4">------</div>
+                    <p class="text-stone-300 mb-4">Share this code with others to join</p>
+                    <button id="copy-code" class="text-sm bg-stone-600 hover:bg-stone-500 px-4 py-2 rounded-lg inline-flex items-center">
+                        <i data-feather="copy" class="mr-2 w-4 h-4"></i> Copy Code
+                    </button>
+                </div>
+            </div>
+
+            <div class="mb-6">
+                <h3 class="text-xl font-semibold mb-3">Host Information</h3>
+                <div class="mb-3">
+                    <label for="hostname" class="block text-stone-300 mb-1">Your Display Name</label>
+                    <input 
+                        type="text" 
+                        id="hostname" 
+                        class="w-full bg-stone-700 border border-stone-600 rounded-lg py-2 px-3 focus:outline-none focus:ring-2 focus:ring-stone-500 focus:border-transparent"
+                        placeholder="Enter your name"
+                        maxlength="20"
+                        value="Host"
+                    >
+                </div>
+            </div>
+
+            <div class="mb-6">
+                <h3 class="text-xl font-semibold mb-3">Session Options</h3>
+                <div class="space-y-3">
+                    <div class="flex items-center">
+                        <label class="inline-flex items-center cursor-pointer">
+                            <input type="checkbox" id="allow-files" class="form-checkbox rounded bg-stone-600 border-stone-500 text-stone-500 focus:ring-stone-500 focus:ring-offset-stone-800" checked>
+                            <span class="ml-2 text-stone-300">Allow file sharing</span>
+                        </label>
+                    </div>
+                    <div class="flex items-center">
+                        <label class="inline-flex items-center cursor-pointer">
+                            <input type="checkbox" id="end-on-leave" class="form-checkbox rounded bg-stone-600 border-stone-500 text-stone-500 focus:ring-stone-500 focus:ring-offset-stone-800" checked>
+                            <span class="ml-2 text-stone-300">End session when I leave</span>
+                        </label>
+                    </div>
+                </div>
+                <p class="text-xs text-stone-400 mt-3">
+                    <i data-feather="info" class="w-3 h-3 inline"></i> Your session will be peer-to-peer encrypted
+                </p>
+            </div>
+
+            <button id="start-session" class="w-full bg-stone-600 hover:bg-stone-500 text-white py-3 px-4 rounded-lg transition flex items-center justify-center font-semibold">
+                <i data-feather="play" class="mr-2 w-5 h-5"></i> Start Session
+            </button>
+        </div>
+    </main>
+
+    <script>
+        feather.replace();
+        
+        // Generate random 6-digit code
+        function generateRoomCode() {
+            return Math.floor(100000 + Math.random() * 900000).toString();
+        }
+        
+        // Display room code
+        document.addEventListener('DOMContentLoaded', () => {
+            const roomCodeElement = document.getElementById('room-code');
+            const refreshButton = document.getElementById('refresh-code');
+            const startButton = document.getElementById('start-session');
+            const copyButton = document.getElementById('copy-code');
+            const hostnameInput = document.getElementById('hostname');
+            
+            let roomCode = generateRoomCode();
+            roomCodeElement.textContent = roomCode;
+            
+            refreshButton.addEventListener('click', () => {
+                roomCode = generateRoomCode();
+                roomCodeElement.textContent = roomCode;
+                
+                // Animate the refresh icon
+                const icon = refreshButton.querySelector('i');
+                icon.style.transform = 'rotate(360deg)';
+                icon.style.transition = 'transform 0.5s';
+                setTimeout(() => {
+                    icon.style.transform = 'rotate(0deg)';
+                }, 500);
+            });
+            
+            copyButton.addEventListener('click', () => {
+                navigator.clipboard.writeText(roomCode).then(() => {
+                    const originalText = copyButton.innerHTML;
+                    copyButton.innerHTML = '<i data-feather="check" class="mr-2 w-4 h-4"></i> Copied!';
+                    feather.replace();
+                    setTimeout(() => {
+                        copyButton.innerHTML = originalText;
+                        feather.replace();
+                    }, 2000);
+                });
+            });
+            
+            startButton.addEventListener('click', () => {
+                const hostname = hostnameInput.value.trim() || 'Host';
+                
+                // Get session options
+                const allowFiles = document.getElementById('allow-files').checked;
+                const endOnLeave = document.getElementById('end-on-leave').checked;
+                
+                // Store options in session storage for the session page to access
+                sessionStorage.setItem('allowFiles', allowFiles);
+                sessionStorage.setItem('endOnLeave', endOnLeave);
+                
+                // Redirect to session page with proper parameters
+                window.location.href = `session.html?room=${roomCode}&host=true&username=${encodeURIComponent(hostname)}`;
+            });
+            
+            // Allow pressing Enter to start session
+            hostnameInput.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    startButton.click();
+                }
+            });
+        });
+    </script>
+</body>
+</html>
