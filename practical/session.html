@@ -477,6 +477,7 @@
             if (element) {
                 element.remove();
                 addSystemMessage(`${name} left the session`);
+                updateParticipantCount();
             }
         }
 
