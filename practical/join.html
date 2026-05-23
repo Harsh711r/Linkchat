@@ -69,12 +69,12 @@
             <div class="mb-6">
                 <label for="room-code-input" class="block text-stone-300 mb-2">Enter 6-digit room code</label>
                 <div class="relative">
-                    <input 
-                        type="text" 
-                        id="room-code-input" 
-                        maxlength="6" 
-                        pattern="\d{6}" 
-                        inputmode="numeric" 
+                    <input
+                        type="text"
+                        id="room-code-input"
+                        maxlength="6"
+                        pattern="\d{6}"
+                        inputmode="numeric"
                         class="w-full code-input bg-stone-700 border border-stone-600 rounded-lg py-3 px-4 text-2xl font-mono text-center focus:outline-none focus:ring-2 focus:ring-stone-500 focus:border-transparent"
                         placeholder="000000"
                     >
@@ -87,9 +87,9 @@
                 <h3 class="text-xl font-semibold mb-3">Your Information</h3>
                 <div class="mb-3">
                     <label for="username" class="block text-stone-300 mb-1">Display Name</label>
-                    <input 
-                        type="text" 
-                        id="username" 
+                    <input
+                        type="text"
+                        id="username"
                         class="w-full bg-stone-700 border border-stone-600 rounded-lg py-2 px-3 focus:outline-none focus:ring-2 focus:ring-stone-500 focus:border-transparent"
                         placeholder="Your name"
                         maxlength="20"
@@ -113,110 +113,53 @@
 
     <script>
         feather.replace();
-        
+
         document.addEventListener('DOMContentLoaded', () => {
             const roomCodeInput = document.getElementById('room-code-input');
             const usernameInput = document.getElementById('username');
             const joinButton = document.getElementById('join-session');
             const codeError = document.getElementById('code-error');
-            const connectionStatus = document.getElementById('connection-status');
-            const statusText = document.getElementById('status-text');
-            
+
             // Auto-advance between code digits
             roomCodeInput.addEventListener('input', (e) => {
                 e.target.value = e.target.value.replace(/\D/g, '');
-                
+
                 if (e.target.value.length === 6) {
                     codeError.classList.add('hidden');
                 }
             });
-            
+
             joinButton.addEventListener('click', async () => {
                 const roomCode = roomCodeInput.value;
                 const username = usernameInput.value.trim();
-                
+
                 if (roomCode.length !== 6) {
                     codeError.textContent = 'Please enter a valid 6-digit code';
                     codeError.classList.remove('hidden');
                     return;
                 }
-                
+
                 if (!username) {
                     usernameInput.focus();
                     codeError.textContent = 'Please enter your display name';
                     codeError.classList.remove('hidden');
                     return;
                 }
-                
-                // Disable button and show status
-                joinButton.disabled = true;
-                joinButton.classList.add('opacity-50', 'cursor-not-allowed');
-                connectionStatus.classList.remove('hidden');
-                codeError.classList.add('hidden');
-                
-                // Test connection to host
-                try {
-                    // Create a temporary peer to test connection
-                    const testPeer = new Peer({
-                        config: {
-                            iceServers: [
-                                { urls: 'stun:stun.l.google.com:19302' },
-                                { urls: 'stun:global.stun.twilio.com:3478' }
-                            ]
-                        }
-                    });
-                    
-                    testPeer.on('open', () => {
-                        statusText.textContent = 'Connecting to host...';
-                        
-                        // Try to connect to the host
-                        const conn = testPeer.connect(`peerlink-${roomCode}`);
-                        
-                        conn.on('open', () => {
-                            testPeer.destroy();
-                            // Connection successful, redirect to session
-                            window.location.href = `session.html?room=${roomCode}&username=${encodeURIComponent(username)}&host=false`;
-                        });
-                        
-                        conn.on('error', (err) => {
-                            console.error('Connection error:', err);
-                            testPeer.destroy();
-                            codeError.textContent = 'Room not found or host is offline. Please check the code.';
-                            codeError.classList.remove('hidden');
-                            connectionStatus.classList.add('hidden');
-                            joinButton.disabled = false;
-                            joinButton.classList.remove('opacity-50', 'cursor-not-allowed');
-                        });
-                        
-                        // Timeout after 10 seconds
-                        setTimeout(() => {
-                            if (!conn.open) {
-                                testPeer.destroy();
-                                codeError.textContent = 'Connection timeout. Host may be offline.';
-                                codeError.classList.remove('hidden');
-                                connectionStatus.classList.add('hidden');
-                                joinButton.disabled = false;
-                                joinButton.classList.remove('opacity-50', 'cursor-not-allowed');
-                            }
-                        }, 10000);
-                    });
-                    
-                    testPeer.on('error', (err) => {
-                        console.error('Peer error:', err);
-                        codeError.textContent = 'Connection error. Please try again.';
-                        codeError.classList.remove('hidden');
-                        connectionStatus.classList.add('hidden');
-                        joinButton.disabled = false;
-                        joinButton.classList.remove('opacity-50', 'cursor-not-allowed');
-                    });
-                    
-                } catch (err) {
-                    console.error('Error:', err);
-                    codeError.textContent = 'Failed to connect. Please try again.';
-                    codeError.classList.remove('hidden');
-                    connectionStatus.classList.add('hidden');
-                    joinButton.disabled = false;
-                    joinButton.classList.remove('opacity-50', 'cursor-not-allowed');
+
+                // Direct redirect to session page.
+                // Reliability improvements will be handled in session.html
+                window.location.href = `session.html?room=${roomCode}&username=${encodeURIComponent(username)}&host=false`;
+            });
+
+            // Allow pressing Enter to join
+            usernameInput.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    joinButton.click();
+                }
+            });
+            roomCodeInput.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    joinButton.click();
                 }
             });
         });
